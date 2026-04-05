@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel-Arb</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sand:   { 50: '#faf8f5', 100: '#f5f0ea', 200: '#ebe3d7', 300: '#d9cdbf', 400: '#c4b5a0', 500: '#a89880' },
+                        sage:   { 50: '#f4f7f4', 100: '#e6ede6', 200: '#cddccd', 300: '#a8c3a8', 400: '#7da67d', 500: '#5d8a5d', 600: '#4a7a4a' },
+                        clay:   { 50: '#fdf6f3', 100: '#f9e8e0', 200: '#f0cfc0', 300: '#e4ad95', 400: '#d48b6a', 500: '#c06e4a' },
+                        stone:  { 50: '#f9f9f8', 100: '#f0efed', 200: '#e0dedb', 300: '#c8c4bf', 400: '#a8a39c', 500: '#8a847c', 600: '#6b665f', 700: '#504c47', 800: '#37342f' },
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['SF Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        body { background: #f9f9f8; color: #504c47; }
+
+        /* ── Ticker tape ─────────────────────────────────────── */
+        .ticker-wrap { overflow: hidden; white-space: nowrap; }
+        .ticker-content {
+            display: inline-block;
+            animation: ticker 60s linear infinite;
+        }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+        /* ── Smooth transitions everywhere ────────────────── */
+        .card {
+            background: white;
+            border: 1px solid #e0dedb;
+            border-radius: 16px;
+            transition: box-shadow 0.35s ease, transform 0.25s ease;
+        }
+        .card:hover {
+            box-shadow: 0 8px 30px rgba(80, 76, 71, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* ── Chart canvas ─────────────────────────────────── */
+        #spreadChart { border-radius: 12px; }
+
+        /* ── Custom scrollbar ─────────────────────────────── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c8c4bf; border-radius: 10px; }
+
+        /* ── Dropdown animation ───────────────────────────── */
+        .dropdown-panel {
+            max-height: 0; overflow: hidden; opacity: 0;
+            transition: max-height 0.4s ease, opacity 0.3s ease, padding 0.3s ease;
+        }
+        .dropdown-panel.open {
+            max-height: 2000px; opacity: 1;
+        }
+
+        /* ── Severity left accents ────────────────────────── */
+        .accent-critical { border-left: 3px solid #c06e4a; }
+        .accent-high     { border-left: 3px solid #d4a76a; }
+        .accent-medium   { border-left: 3px solid #7da67d; }
+        .accent-low      { border-left: 3px solid #c8c4bf; }
+
+        /* ── Pulsing dot ──────────────────────────────────── */
+        .pulse { animation: softPulse 3s ease-in-out infinite; }
+        @keyframes softPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ── Tooltip ──────────────────────────────────────── */
+        .tip { position: relative; }
+        .tip::after {
+            content: attr(data-tip);
+            position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+            background: #37342f; color: #f5f0ea; font-size: 11px;
+            padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .tip:hover::after { opacity: 1; }
+
+        /* ── Button style ─────────────────────────────────── */
+        .btn {
+            border-radius: 10px; font-weight: 500; font-size: 13px;
+            padding: 8px 16px; cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .btn-primary { background: #5d8a5d; color: white; border: none; }
+        .btn-primary:hover { background: #4a7a4a; box-shadow: 0 4px 14px rgba(93,138,93,0.25); }
+        .btn-secondary { background: white; color: #6b665f; border: 1px solid #e0dedb; }
+        .btn-secondary:hover { background: #f5f0ea; border-color: #c8c4bf; }
+        .btn-danger { background: #c06e4a; color: white; border: none; }
+        .btn-danger:hover { background: #a85d3f; }
+
+        /* ── Tabs ─────────────────────────────────────────── */
+        .tab { padding: 10px 18px; font-size: 13px; font-weight: 500; color: #a8a39c; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.25s ease; }
+        .tab:hover { color: #6b665f; }
+        .tab.active { color: #5d8a5d; border-bottom-color: #5d8a5d; }
+
+        /* ── Badge ────────────────────────────────────────── */
+        .badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.5px; }
+        .badge-live   { background: #e6ede6; color: #4a7a4a; }
+        .badge-sim    { background: #f9e8e0; color: #c06e4a; }
+        .badge-high   { background: #f9e8e0; color: #c06e4a; }
+        .badge-medium { background: #fef3c7; color: #92400e; }
+        .badge-low    { background: #f0efed; color: #8a847c; }
+        .badge-injected { background: #ede9fe; color: #6d28d9; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TICKER TAPE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="bg-stone-800 text-sand-200 text-xs py-1.5">
+        <div class="ticker-wrap">
+            <div class="ticker-content font-mono" id="ticker-tape">
+                <span class="mx-6">SENTINEL-ARB loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- HEADER -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <header class="border-b border-stone-200 bg-white/80 backdrop-blur-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-2.5 h-2.5 rounded-full bg-sage-500 pulse"></div>
+                <h1 class="text-lg font-semibold tracking-tight text-stone-800">Sentinel-Arb</h1>
+                <span class="text-xs text-stone-400 hidden sm:inline">Palm Oil Basis Monitor</span>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-stone-400">
+                <div id="data-mode-badge" class="badge badge-sim">SIM</div>
+                <span id="source-label" class="hidden sm:inline">—</span>
+                <span id="clock" class="font-mono"></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- MAIN -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+        <!-- ── Price Cards Row ──────────────────────────────────────── -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="card p-5">
+                <div class="text-xs text-stone-400 mb-1">FOB Malaysia</div>
+                <div id="fob-price" class="text-2xl font-semibold text-stone-800 font-mono">—</div>
+                <div class="text-[11px] text-stone-300 mt-1">$/MT CPO</div>
+            </div>
+            <div class="card p-5">
+                <div class="text-xs text-stone-400 mb-1">CIF Rotterdam</div>
+                <div id="cif-price" class="text-2xl font-semibold text-stone-800 font-mono">—</div>
+                <div class="text-[11px] text-stone-300 mt-1">$/MT Refined</div>
+            </div>
+            <div class="card p-5" id="spread-card">
+                <div class="text-xs text-stone-400 mb-1">Basis Spread</div>
+                <div id="spread-price" class="text-2xl font-semibold text-sage-600 font-mono">—</div>
+                <div id="spread-deviation" class="text-[11px] text-stone-300 mt-1">vs fair value</div>
+            </div>
+            <div class="card p-5" id="shock-status-card">
+                <div class="text-xs text-stone-400 mb-1">Market Status</div>
+                <div id="shock-status" class="text-2xl font-semibold text-stone-300">Nominal</div>
+                <div id="shock-count-label" class="text-[11px] text-stone-300 mt-1">No active shocks</div>
+            </div>
+        </section>
+
+        <!-- ── Chart + Sidebar ──────────────────────────────────────── -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Chart area -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="card p-6">
+                    <div class="flex items-center justify-between mb-5">
+                        <h2 class="text-sm font-semibold text-stone-700">Spread History</h2>
+                        <div class="flex gap-2">
+                            <button onclick="setChartMode('spread')" id="btn-chart-spread" class="btn btn-primary text-xs px-3 py-1.5">Spread</button>
+                            <button onclick="setChartMode('prices')" id="btn-chart-prices" class="btn btn-secondary text-xs px-3 py-1.5">Prices</button>
+                        </div>
+                    </div>
+                    <div style="height: 340px;">
+                        <canvas id="spreadChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- P&L Calculator -->
+                <div class="card p-6">
+                    <h2 class="text-sm font-semibold text-stone-700 mb-4">P&L Calculator</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 items-end">
+                        <div>
+                            <label class="text-xs text-stone-400 block mb-1.5">Entry Spread</label>
+                            <input id="pnl-entry" type="number" step="0.01" value="128.00"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-700 focus:border-sage-400 focus:ring-1 focus:ring-sage-200 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="text-xs text-stone-400 block mb-1.5">Exit Spread</label>
+                            <input id="pnl-exit" type="number" step="0.01" placeholder="Current"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-700 focus:border-sage-400 focus:ring-1 focus:ring-sage-200 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="text-xs text-stone-400 block mb-1.5">Volume (MT)</label>
+                            <input id="pnl-volume" type="number" value="5000"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-700 focus:border-sage-400 focus:ring-1 focus:ring-sage-200 outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="text-xs text-stone-400 block mb-1.5">Txn Cost ($)</label>
+                            <input id="pnl-cost" type="number" value="2500"
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm font-mono text-stone-700 focus:border-sage-400 focus:ring-1 focus:ring-sage-200 outline-none transition-all">
+                        </div>
+                        <button onclick="calculatePnL()" class="btn btn-primary">Calculate</button>
+                    </div>
+                    <div id="pnl-result" class="mt-5 hidden">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="bg-stone-50 rounded-xl p-4 text-center">
+                                <div class="text-xs text-stone-400">Gross P&L</div>
+                                <div id="pnl-gross" class="font-mono text-lg font-semibold mt-1">—</div>
+                            </div>
+                            <div class="bg-stone-50 rounded-xl p-4 text-center">
+                                <div class="text-xs text-stone-400">Net P&L</div>
+                                <div id="pnl-net" class="font-mono text-lg font-semibold mt-1">—</div>
+                            </div>
+                            <div class="bg-stone-50 rounded-xl p-4 text-center">
+                                <div class="text-xs text-stone-400">P&L per MT</div>
+                                <div id="pnl-per-mt" class="font-mono text-lg font-semibold mt-1">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right sidebar -->
+            <div class="space-y-6">
+
+                <!-- Simulation Engine -->
+                <div class="card overflow-hidden">
+                    <div class="p-5 border-b border-stone-100">
+                        <h2 class="text-sm font-semibold text-stone-700">Simulation Engine</h2>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="flex border-b border-stone-100 overflow-x-auto">
+                        <button onclick="setSimTab('news')" id="tab-news" class="tab active whitespace-nowrap">News</button>
+                        <button onclick="setSimTab('logistics')" id="tab-logistics" class="tab whitespace-nowrap">Logistics</button>
+                        <button onclick="setSimTab('policy')" id="tab-policy" class="tab whitespace-nowrap">Policy</button>
+                        <button onclick="setSimTab('ai')" id="tab-ai" class="tab whitespace-nowrap">AI</button>
+                    </div>
+
+                    <div class="max-h-[520px] overflow-y-auto">
+
+                        <!-- ── NEWS TAB ────────────────────────────────── -->
+                        <div id="panel-news" class="p-5 space-y-4">
+                            <p class="text-xs text-stone-400 leading-relaxed">
+                                Live RSS headlines scored by Claude Haiku.
+                                Headlines rated <span class="font-semibold text-clay-500">HIGH</span> are auto-injected as market shocks.
+                            </p>
+                            <div class="flex items-center gap-3">
+                                <button onclick="pollNewsNow()" id="btn-poll-news" class="btn btn-secondary text-xs flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    Refresh
+                                </button>
+                                <label class="flex items-center gap-1.5 text-xs text-stone-400 cursor-pointer select-none">
+                                    <input type="checkbox" id="auto-inject-toggle" checked
+                                        onchange="toggleAutoInject(this.checked)"
+                                        class="w-3.5 h-3.5 rounded border-stone-300 text-sage-500 focus:ring-sage-300">
+                                    Auto-inject
+                                </label>
+                            </div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="bg-stone-50 rounded-lg p-2 text-center">
+                                    <div class="text-[10px] text-stone-400">Tracked</div>
+                                    <div id="stat-tracked" class="font-mono text-sm font-semibold text-stone-700">0</div>
+                                </div>
+                                <div class="bg-stone-50 rounded-lg p-2 text-center">
+                                    <div class="text-[10px] text-stone-400">High</div>
+                                    <div id="stat-high" class="font-mono text-sm font-semibold text-clay-500">0</div>
+                                </div>
+                                <div class="bg-stone-50 rounded-lg p-2 text-center">
+                                    <div class="text-[10px] text-stone-400">Medium</div>
+                                    <div id="stat-medium" class="font-mono text-sm font-semibold text-sand-500">0</div>
+                                </div>
+                                <div class="bg-stone-50 rounded-lg p-2 text-center">
+                                    <div class="text-[10px] text-stone-400">Injected</div>
+                                    <div id="stat-injected" class="font-mono text-sm font-semibold text-purple-500">0</div>
+                                </div>
+                            </div>
+                            <div id="news-feed-list" class="space-y-3">
+                                <div class="text-xs text-stone-400 text-center py-6">
+                                    Headlines appear after first poll cycle. Click Refresh to fetch now.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── LOGISTICS TAB ───────────────────────────── -->
+                        <div id="panel-logistics" class="p-5 space-y-3 hidden">
+                            <div id="logistics-scenarios" class="space-y-3"></div>
+                        </div>
+
+                        <!-- ── POLICY TAB ──────────────────────────────── -->
+                        <div id="panel-policy" class="p-5 space-y-3 hidden">
+                            <div id="policy-scenarios" class="space-y-3"></div>
+                        </div>
+
+                        <!-- ── AI SHOCK TAB ────────────────────────────── -->
+                        <div id="panel-ai" class="p-5 space-y-4 hidden">
+                            <p class="text-xs text-stone-400">
+                                Paste a news headline. Claude Haiku will score the event and inject it as a shock.
+                            </p>
+                            <textarea id="headline-input" rows="3" placeholder="e.g., Indonesia announces immediate palm oil export ban..."
+                                class="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2.5 text-sm text-stone-700 focus:border-sage-400 focus:ring-1 focus:ring-sage-200 outline-none resize-none transition-all"></textarea>
+                            <button onclick="analyzeHeadline()" id="btn-analyze" class="btn btn-primary w-full flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                Analyze & Inject
+                            </button>
+                            <div id="ai-result" class="hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Active shocks bar -->
+                    <div id="active-shocks-bar" class="border-t border-stone-100 p-4 hidden">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-2 h-2 rounded-full bg-clay-400 pulse"></div>
+                                <span id="active-shock-text" class="text-xs text-clay-500 font-medium"></span>
+                            </div>
+                            <button onclick="clearShocks()" class="btn btn-secondary text-xs px-3 py-1">Clear</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trader's Brief -->
+                <div id="traders-brief-panel" class="card p-5 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-semibold text-sand-500">Trader's Brief</h2>
+                        <button onclick="closeBrief()" class="text-stone-300 hover:text-stone-500 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div id="brief-content" class="space-y-3 text-sm"></div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- FOOTER -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <footer class="border-t border-stone-200 py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-6 flex items-center justify-between text-xs text-stone-300">
+            <span>Sentinel-Arb &middot; Geopolitical Stress-Tester & Basis Monitor</span>
+            <span id="footer-source" class="font-mono">—</span>
+        </div>
+    </footer>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- JAVASCRIPT -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <script>
+    // ═════════════════════════════════════════════════════════════════
+    // STATE
+    // ═════════════════════════════════════════════════════════════════
+    let chartMode = 'spread';
+    let spreadChart = null;
+    let currentTab = 'news';
+    let currentSpread = 0;
+
+    // ═════════════════════════════════════════════════════════════════
+    // INIT
+    // ═════════════════════════════════════════════════════════════════
+    let _isOnline = true;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        initChart();
+        updateClock();
+        setInterval(updateClock, 1000);
+        await loadScenarios();
+        await refreshData();
+        await refreshNewsFeed();   // load news state immediately on open
+        setInterval(refreshData, 5000);
+        setInterval(refreshNewsFeed, 30000);
+    });
+
+    // ═════════════════════════════════════════════════════════════════
+    // CLOCK
+    // ═════════════════════════════════════════════════════════════════
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').textContent =
+            now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' UTC';
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // CHART — earthy palette
+    // ═════════════════════════════════════════════════════════════════
+    function initChart() {
+        const ctx = document.getElementById('spreadChart').getContext('2d');
+        spreadChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Spread', data: [], borderColor: '#5d8a5d', backgroundColor: 'rgba(93,138,93,0.06)', borderWidth: 2, fill: true, tension: 0.4, pointRadius: 0, pointHitRadius: 8 },
+                    { label: 'Fair Value', data: [], borderColor: '#c8c4bf', borderWidth: 1, borderDash: [6, 4], fill: false, tension: 0, pointRadius: 0 },
+                    { label: 'FOB Malaysia', data: [], borderColor: '#7da67d', borderWidth: 2, fill: false, tension: 0.4, pointRadius: 0, hidden: true },
+                    { label: 'CIF Rotterdam', data: [], borderColor: '#d48b6a', borderWidth: 2, fill: false, tension: 0.4, pointRadius: 0, hidden: true },
+                ],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { display: true, labels: { color: '#a8a39c', font: { size: 11 }, usePointStyle: true, pointStyleWidth: 10 } },
+                    tooltip: {
+                        backgroundColor: '#37342f', titleColor: '#f5f0ea', bodyColor: '#ebe3d7',
+                        borderWidth: 0, cornerRadius: 8, padding: 10,
+                        titleFont: { family: 'SF Mono, Menlo, monospace', size: 12 },
+                        bodyFont: { family: 'SF Mono, Menlo, monospace', size: 11 },
+                        callbacks: { label: (c) => `${c.dataset.label}: $${c.parsed.y.toFixed(2)}` },
+                    },
+                },
+                scales: {
+                    x: { ticks: { color: '#c8c4bf', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: 'rgba(200,196,191,0.2)' }, border: { display: false } },
+                    y: { ticks: { color: '#c8c4bf', font: { family: 'SF Mono, monospace', size: 11 }, callback: (v) => '$' + v.toFixed(0) }, grid: { color: 'rgba(200,196,191,0.15)' }, border: { display: false } },
+                },
+                animation: { duration: 400, easing: 'easeOutQuart' },
+            },
+        });
+    }
+
+    function setChartMode(mode) {
+        chartMode = mode;
+        const s = document.getElementById('btn-chart-spread');
+        const p = document.getElementById('btn-chart-prices');
+        if (mode === 'spread') {
+            s.className = 'btn btn-primary text-xs px-3 py-1.5';
+            p.className = 'btn btn-secondary text-xs px-3 py-1.5';
+            spreadChart.data.datasets[0].hidden = false; spreadChart.data.datasets[1].hidden = false;
+            spreadChart.data.datasets[2].hidden = true; spreadChart.data.datasets[3].hidden = true;
+        } else {
+            s.className = 'btn btn-secondary text-xs px-3 py-1.5';
+            p.className = 'btn btn-primary text-xs px-3 py-1.5';
+            spreadChart.data.datasets[0].hidden = true; spreadChart.data.datasets[1].hidden = true;
+            spreadChart.data.datasets[2].hidden = false; spreadChart.data.datasets[3].hidden = false;
+        }
+        spreadChart.update();
+    }
+
+    function formatChartLabel(isoStr) {
+        const date = new Date(isoStr);
+        const today = new Date();
+        const isToday = date.toDateString() === today.toDateString();
+        // Show HH:MM for today's ticks, "Mon DD" for historical dates
+        if (isToday) {
+            return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    function updateChart(history) {
+        spreadChart.data.labels                 = history.map(d => formatChartLabel(d.timestamp));
+        spreadChart.data.datasets[0].data       = history.map(d => d.spread);
+        spreadChart.data.datasets[1].data       = history.map(d => d.base_spread);
+        spreadChart.data.datasets[2].data       = history.map(d => d.fob_malaysia);
+        spreadChart.data.datasets[3].data       = history.map(d => d.cif_rotterdam);
+        spreadChart.update('none');
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // DATA REFRESH
+    // ═════════════════════════════════════════════════════════════════
+    async function refreshData() {
+        try {
+            const [curR, histR, shocksR, statusR] = await Promise.all([
+                fetch('/api/market/current'), fetch('/api/market/history?n=90'),
+                fetch('/api/shock/active'), fetch('/api/data-status'),
+            ]);
+            const current = await curR.json();
+            const history = await histR.json();
+            const shocks = await shocksR.json();
+            const dataStatus = await statusR.json();
+
+            // Badge
+            const badge = document.getElementById('data-mode-badge');
+            const isLive = current.data_mode === 'live';
+            badge.textContent = isLive ? 'LIVE' : 'SIM';
+            badge.className = `badge ${isLive ? 'badge-live' : 'badge-sim'}`;
+
+            // Source label
+            const src = current.data_source || dataStatus.source || 'simulated';
+            document.getElementById('source-label').textContent = src;
+            document.getElementById('footer-source').textContent = `Source: ${src} ${dataStatus.market_status === 'open' ? '· Market Open' : ''}`;
+
+            // Prices
+            document.getElementById('fob-price').textContent = '$' + current.fob_malaysia.toFixed(2);
+            document.getElementById('cif-price').textContent = '$' + current.cif_rotterdam.toFixed(2);
+            document.getElementById('spread-price').textContent = '$' + current.spread.toFixed(2);
+            currentSpread = current.spread;
+
+            const dev = current.spread - current.base_spread;
+            const devPct = ((dev / current.base_spread) * 100).toFixed(1);
+            const devEl = document.getElementById('spread-deviation');
+            devEl.textContent = `${dev >= 0 ? '+' : ''}${dev.toFixed(2)} (${devPct}%) vs fair value`;
+            devEl.className = `text-[11px] mt-1 ${dev >= 0 ? 'text-sage-500' : 'text-clay-500'}`;
+
+            // Spread card color
+            const sc = document.getElementById('spread-card');
+            const sp = document.getElementById('spread-price');
+            if (Math.abs(dev) > 15) { sp.className = 'text-2xl font-semibold text-clay-500 font-mono'; }
+            else if (Math.abs(dev) > 8) { sp.className = 'text-2xl font-semibold text-sand-500 font-mono'; }
+            else { sp.className = 'text-2xl font-semibold text-sage-600 font-mono'; }
+
+            // Shock status
+            const ss = document.getElementById('shock-status');
+            const sl = document.getElementById('shock-count-label');
+            const ab = document.getElementById('active-shocks-bar');
+            if (shocks.count > 0) {
+                ss.textContent = 'Stressed';
+                ss.className = 'text-2xl font-semibold text-clay-500';
+                sl.textContent = `${shocks.count} active shock${shocks.count > 1 ? 's' : ''}`;
+                ab.classList.remove('hidden');
+                document.getElementById('active-shock-text').textContent = `${shocks.count} shock${shocks.count > 1 ? 's' : ''} active`;
+            } else {
+                ss.textContent = 'Nominal';
+                ss.className = 'text-2xl font-semibold text-stone-300';
+                sl.textContent = 'No active shocks';
+                ab.classList.add('hidden');
+            }
+
+            // Ticker tape
+            updateTicker(current, shocks, dataStatus);
+
+            // Chart
+            updateChart(history);
+
+        } catch (err) {
+            _isOnline = false;
+            // Show subtle offline indicator without crashing
+            const badge = document.getElementById('data-mode-badge');
+            badge.textContent = 'OFFLINE';
+            badge.className = 'badge' ;
+            badge.style.background = '#f0efed';
+            badge.style.color = '#a8a39c';
+            document.getElementById('source-label').textContent = 'Reconnecting...';
+        }
+    }
+
+    function updateTicker(current, shocks, status) {
+        const items = [
+            `FOB MY: $${current.fob_malaysia.toFixed(2)}`,
+            `CIF RTD: $${current.cif_rotterdam.toFixed(2)}`,
+            `Spread: $${current.spread.toFixed(2)}`,
+            `Fair: $${current.base_spread.toFixed(2)}`,
+        ];
+        if (shocks.count > 0) {
+            shocks.shocks.forEach(s => {
+                items.push(`SHOCK: ${s.name} (${s.remaining_seconds}s left)`);
+            });
+        }
+        const src = current.data_source || status.source || 'sim';
+        items.push(`Source: ${src}`);
+
+        const doubled = [...items, ...items].map(t => `<span class="mx-8 text-sand-300">${t}</span>`).join('<span class="text-stone-600">·</span>');
+        document.getElementById('ticker-tape').innerHTML = doubled;
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SCENARIOS
+    // ═════════════════════════════════════════════════════════════════
+    async function loadScenarios() {
+        try {
+            const res = await fetch('/api/scenarios');
+            const data = await res.json();
+            renderScenarios('logistics-scenarios', data.logistics, 'logistics');
+            renderScenarios('policy-scenarios', data.policy, 'policy');
+        } catch (err) {}
+    }
+
+    function renderScenarios(containerId, scenarios, type) {
+        const c = document.getElementById(containerId);
+        c.innerHTML = '';
+        for (const [key, s] of Object.entries(scenarios)) {
+            const accent = { critical: 'accent-critical', high: 'accent-high', medium: 'accent-medium', low: 'accent-low' }[s.severity] || '';
+            const badgeCls = { critical: 'badge-high', high: 'badge-high', medium: 'badge-medium', low: 'badge-low' }[s.severity] || 'badge-low';
+            c.innerHTML += `
+                <div class="bg-stone-50 rounded-xl p-4 ${accent} hover:bg-stone-100 transition-all duration-300 cursor-pointer group" onclick="injectShock('${type}','${key}')">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <span class="text-xs font-medium text-stone-700">${s.name}</span>
+                                <span class="badge ${badgeCls}">${s.severity.toUpperCase()}</span>
+                            </div>
+                            <p class="text-[11px] text-stone-400 leading-relaxed line-clamp-2">${s.description}</p>
+                            <div class="flex gap-3 mt-2 text-[10px] font-mono text-stone-300">
+                                <span>+$${s.freight_impact} freight</span>
+                                <span>${s.spread_multiplier}x spread</span>
+                                <span>${s.duration_hours}h</span>
+                            </div>
+                        </div>
+                        <button class="shrink-0 btn btn-danger text-xs px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">Inject</button>
+                    </div>
+                </div>`;
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SHOCKS
+    // ═════════════════════════════════════════════════════════════════
+    async function injectShock(type, key) {
+        try {
+            const res = await fetch(`/api/shock/${type}/${key}`, { method: 'POST' });
+            const data = await res.json();
+            showTradersBrief(data.traders_brief, data.shock, data.combined_state);
+            await refreshData();
+        } catch (err) {}
+    }
+
+    async function analyzeHeadline() {
+        const headline = document.getElementById('headline-input').value.trim();
+        if (!headline) return;
+        const btn = document.getElementById('btn-analyze');
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Analyzing...';
+        try {
+            const res = await fetch('/api/shock/headline', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ headline }) });
+            const data = await res.json();
+            const a = data.analysis;
+            const mColor = a.multiplier >= 1.5 ? 'text-clay-500' : a.multiplier >= 1.2 ? 'text-sand-500' : 'text-sage-500';
+            document.getElementById('ai-result').innerHTML = `
+                <div class="bg-stone-50 rounded-xl p-4 border border-stone-200">
+                    <div class="text-[10px] font-semibold text-stone-400 mb-3">AI ANALYSIS ${a.simulated ? '(Simulated)' : ''}</div>
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div class="text-center"><div class="text-[10px] text-stone-400">Multiplier</div><div class="font-mono text-lg font-semibold ${mColor}">${a.multiplier.toFixed(1)}x</div></div>
+                        <div class="text-center"><div class="text-[10px] text-stone-400">Freight</div><div class="font-mono text-lg font-semibold text-stone-700">+$${a.freight_impact.toFixed(0)}</div></div>
+                        <div class="text-center"><div class="text-[10px] text-stone-400">Severity</div><div class="font-mono text-lg font-semibold text-stone-700">${a.severity.toUpperCase()}</div></div>
+                    </div>
+                    <p class="text-xs text-stone-500 leading-relaxed">${a.reasoning}</p>
+                </div>`;
+            document.getElementById('ai-result').classList.remove('hidden');
+            showTradersBrief(data.traders_brief, data.shock, data.combined_state);
+            await refreshData();
+        } catch (err) {} finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Analyze & Inject';
+        }
+    }
+
+    async function clearShocks() {
+        await fetch('/api/shock/clear', { method: 'POST' });
+        await refreshData();
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // TRADER'S BRIEF
+    // ═════════════════════════════════════════════════════════════════
+    function showTradersBrief(brief, shock, combinedState) {
+        const panel = document.getElementById('traders-brief-panel');
+        const content = document.getElementById('brief-content');
+        const isCompound = brief.compound_mode || (combinedState && combinedState.count > 1);
+        const shockCount = brief.active_shock_count || (combinedState && combinedState.count) || 1;
+
+        // Compound shock header banner
+        let compoundBanner = '';
+        if (isCompound && combinedState) {
+            const names = (combinedState.shock_names || []).join(' + ');
+            const compMult = combinedState.combined_spread_multiplier
+                ? combinedState.combined_spread_multiplier.toFixed(3) + 'x'
+                : '—';
+            compoundBanner = `
+                <div class="bg-clay-50 border border-clay-200 rounded-lg p-3 mb-1" style="background:#fdf6f3;border-color:#f0cfc0;">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-bold text-clay-500" style="color:#c06e4a;">⚡ COMPOUND SHOCK — ${shockCount} ACTIVE</span>
+                    </div>
+                    <p class="text-[11px] text-stone-500">${names}</p>
+                    <p class="text-[11px] font-mono text-stone-600 mt-1">Compounded multiplier: <strong>${compMult}</strong> · Freight: +$${combinedState.combined_freight_impact || 0}/MT</p>
+                    <p class="text-[10px] text-stone-400 mt-1">This brief accounts for the combined effect of all active shocks.</p>
+                </div>`;
+        }
+
+        const borderColors = {
+            Impact: '#d4a76a',
+            Risk:   '#c06e4a',
+            Insight:'#7da67d',
+            Action: '#5d8a5d',
+        };
+
+        const sections = [
+            { label: 'Impact',  text: brief.impact },
+            { label: 'Risk',    text: brief.risk },
+            { label: 'Insight', text: brief.insight },
+        ];
+        if (brief.recommendation) sections.push({ label: 'Action', text: brief.recommendation });
+
+        content.innerHTML = compoundBanner + sections.map(s => `
+            <div class="bg-stone-50 rounded-lg p-3" style="border-left: 3px solid ${borderColors[s.label] || '#c8c4bf'};">
+                <div class="text-[10px] font-semibold text-stone-400 mb-1">${s.label.toUpperCase()}</div>
+                <p class="text-xs text-stone-600 leading-relaxed">${s.text}</p>
+            </div>
+        `).join('') + (brief.simulated ? '<p class="text-[10px] text-stone-300 italic mt-1">Simulated — configure API key for real analysis</p>' : '');
+        panel.classList.remove('hidden');
+    }
+    function closeBrief() { document.getElementById('traders-brief-panel').classList.add('hidden'); }
+
+    // ═════════════════════════════════════════════════════════════════
+    // P&L
+    // ═════════════════════════════════════════════════════════════════
+    async function calculatePnL() {
+        const entry = parseFloat(document.getElementById('pnl-entry').value);
+        const exitVal = document.getElementById('pnl-exit').value;
+        const volume = parseFloat(document.getElementById('pnl-volume').value);
+        const cost = parseFloat(document.getElementById('pnl-cost').value);
+        if (isNaN(entry) || isNaN(volume)) return;
+        const body = { entry_spread: entry, volume_mt: volume, transaction_cost: cost };
+        if (exitVal && !isNaN(parseFloat(exitVal))) body.exit_spread = parseFloat(exitVal);
+        try {
+            const res = await fetch('/api/pnl/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const data = await res.json();
+            document.getElementById('pnl-result').classList.remove('hidden');
+            const fmt = (v) => { const c = v >= 0 ? 'text-sage-600' : 'text-clay-500'; return `<span class="${c}">${v >= 0 ? '+' : ''}$${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>`; };
+            document.getElementById('pnl-gross').innerHTML = fmt(data.gross_pnl);
+            document.getElementById('pnl-net').innerHTML = fmt(data.net_pnl);
+            document.getElementById('pnl-per-mt').innerHTML = fmt(data.pnl_per_mt);
+        } catch (err) {}
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // TABS
+    // ═════════════════════════════════════════════════════════════════
+    function setSimTab(tab) {
+        currentTab = tab;
+        ['news', 'logistics', 'policy', 'ai'].forEach(t => {
+            document.getElementById('tab-' + t).className = t === tab ? 'tab active whitespace-nowrap' : 'tab whitespace-nowrap';
+            document.getElementById('panel-' + t).classList.toggle('hidden', t !== tab);
+        });
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // NEWS FEED
+    // ═════════════════════════════════════════════════════════════════
+    async function refreshNewsFeed() {
+        try {
+            const res = await fetch('/api/news/feed?limit=20');
+            const data = await res.json();
+            renderNewsFeed(data.headlines);
+            updateNewsStats(data.stats);
+        } catch (err) {}
+    }
+
+    function renderNewsFeed(headlines) {
+        const c = document.getElementById('news-feed-list');
+        if (!headlines || headlines.length === 0) {
+            c.innerHTML = '<div class="text-xs text-stone-400 text-center py-6">No headlines yet. Click Refresh to fetch.</div>';
+            return;
+        }
+        const badgeCls = { HIGH: 'badge-high', MEDIUM: 'badge-medium', LOW: 'badge-low' };
+        const accentCls = { critical: 'accent-critical', high: 'accent-high', medium: 'accent-medium', low: 'accent-low' };
+
+        c.innerHTML = headlines.map(h => `
+            <div class="bg-stone-50 rounded-xl p-4 ${accentCls[h.severity] || ''} hover:bg-stone-100 transition-all duration-300 group">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-stone-700 leading-snug mb-1.5">${escapeHtml(h.title)}</p>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            ${h.scored ? `
+                                <span class="badge ${badgeCls[h.confidence] || 'badge-low'}">${h.confidence}</span>
+                                <span class="font-mono text-[10px] text-stone-400">${h.multiplier.toFixed(2)}x</span>
+                                ${h.freight_impact > 0 ? `<span class="font-mono text-[10px] text-stone-300">+$${h.freight_impact.toFixed(0)}</span>` : ''}
+                            ` : '<span class="text-[10px] text-stone-300 italic">scoring...</span>'}
+                            ${h.auto_injected ? '<span class="badge badge-injected">INJECTED</span>' : ''}
+                        </div>
+                        ${h.reasoning ? `<p class="text-[11px] text-stone-400 leading-relaxed mt-1.5">${escapeHtml(h.reasoning)}</p>` : ''}
+                        <div class="text-[10px] text-stone-300 mt-1">${escapeHtml(h.source)}</div>
+                    </div>
+                    ${h.scored && !h.auto_injected ? `<button onclick="injectNewsItem('${h.id}')" class="shrink-0 btn btn-danger text-[10px] px-2.5 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">Inject</button>` : ''}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function updateNewsStats(stats) {
+        if (!stats) return;
+        document.getElementById('stat-tracked').textContent = stats.total_tracked;
+        document.getElementById('stat-high').textContent = stats.high_confidence;
+        document.getElementById('stat-medium').textContent = stats.medium_confidence;
+        document.getElementById('stat-injected').textContent = stats.auto_injected;
+        document.getElementById('auto-inject-toggle').checked = stats.auto_inject_enabled;
+    }
+
+    async function pollNewsNow() {
+        const btn = document.getElementById('btn-poll-news');
+        btn.disabled = true;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Fetching...';
+        try {
+            const res = await fetch('/api/news/poll', { method: 'POST' });
+            await res.json();
+            await refreshNewsFeed();
+            await refreshData();
+        } catch (err) {} finally { btn.disabled = false; btn.innerHTML = orig; }
+    }
+
+    async function toggleAutoInject(enabled) {
+        try { await fetch('/api/news/auto-inject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) }); } catch (err) {}
+    }
+
+    async function injectNewsItem(itemId) {
+        try {
+            const res = await fetch(`/api/news/inject/${itemId}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.traders_brief) showTradersBrief(data.traders_brief, data.shock, data.combined_state);
+            await refreshNewsFeed();
+            await refreshData();
+        } catch (err) {}
+    }
+
+    function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+    </script>
+</body>
+</html>
