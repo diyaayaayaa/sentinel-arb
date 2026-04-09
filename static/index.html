@@ -143,6 +143,66 @@
         .badge-medium { background: #fef3c7; color: #92400e; }
         .badge-low    { background: #f0efed; color: #8a847c; }
         .badge-injected { background: #ede9fe; color: #6d28d9; }
+
+        /* ── Floating Help Bubble ─────────────────────────── */
+        @keyframes haloRing {
+            0%   { box-shadow: 0 0 0 0 rgba(93,138,93,0.55), 0 4px 20px rgba(93,138,93,0.20); }
+            50%  { box-shadow: 0 0 0 10px rgba(93,138,93,0.0), 0 4px 20px rgba(93,138,93,0.28); }
+            100% { box-shadow: 0 0 0 0 rgba(93,138,93,0.55), 0 4px 20px rgba(93,138,93,0.20); }
+        }
+        #help-bubble-btn {
+            position: fixed; bottom: 28px; right: 28px; z-index: 1000;
+            width: 52px; height: 52px; border-radius: 50%;
+            background: #5d8a5d; color: white; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; font-weight: 300; line-height: 1;
+            animation: haloRing 2.8s ease-in-out infinite;
+            transition: background 0.25s ease, transform 0.2s ease;
+        }
+        #help-bubble-btn:hover { background: #4a7a4a; transform: scale(1.08); }
+        #help-bubble-btn.open  { background: #37342f; animation: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.22); }
+
+        #help-panel {
+            position: fixed; bottom: 92px; right: 28px; z-index: 999;
+            width: 340px; max-height: 70vh;
+            background: white; border: 1px solid #e0dedb; border-radius: 20px;
+            box-shadow: 0 16px 48px rgba(80,76,71,0.16);
+            overflow: hidden;
+            transform: translateY(16px) scale(0.96); opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.34,1.56,0.64,1),
+                        opacity 0.22s ease;
+        }
+        #help-panel.open {
+            transform: translateY(0) scale(1); opacity: 1;
+            pointer-events: all;
+        }
+        #help-panel-body {
+            overflow-y: auto; max-height: calc(70vh - 56px);
+            padding: 0 20px 20px;
+        }
+        #help-panel-body::-webkit-scrollbar { width: 4px; }
+        #help-panel-body::-webkit-scrollbar-thumb { background: #c8c4bf; border-radius: 10px; }
+
+        .help-section-title {
+            font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+            color: #a8a39c; text-transform: uppercase;
+            margin: 18px 0 8px; padding-bottom: 6px;
+            border-bottom: 1px solid #f0efed;
+        }
+        .help-faq-item { margin-bottom: 12px; }
+        .help-faq-q { font-size: 12px; font-weight: 600; color: #504c47; margin-bottom: 3px; }
+        .help-faq-a { font-size: 11.5px; color: #8a847c; line-height: 1.55; }
+        .help-impact-row {
+            display: flex; align-items: flex-start; gap: 10px;
+            font-size: 11.5px; color: #6b665f; line-height: 1.5; margin-bottom: 9px;
+        }
+        .help-impact-icon {
+            width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -886,6 +946,108 @@
     }
 
     function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+
+    /* ── Floating Help Bubble ───────────────────────────────────── */
+    function toggleHelpPanel() {
+        const btn   = document.getElementById('help-bubble-btn');
+        const panel = document.getElementById('help-panel');
+        const isOpen = panel.classList.contains('open');
+        panel.classList.toggle('open', !isOpen);
+        btn.classList.toggle('open', !isOpen);
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        btn.innerHTML = !isOpen
+            ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+            : '?';
+    }
     </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- FLOATING HELP BUBBLE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <button id="help-bubble-btn" onclick="toggleHelpPanel()" aria-label="Help & About" aria-expanded="false" title="About Sentinel-Arb">?</button>
+
+    <div id="help-panel" role="dialog" aria-label="About Sentinel-Arb">
+        <!-- Header -->
+        <div style="padding: 18px 20px 14px; border-bottom: 1px solid #f0efed; display:flex; align-items:center; gap:10px;">
+            <div style="width:32px;height:32px;border-radius:10px;background:#e6ede6;display:flex;align-items:center;justify-content:center;font-size:16px;">🛢️</div>
+            <div>
+                <div style="font-size:13px;font-weight:700;color:#37342f;">Sentinel-Arb</div>
+                <div style="font-size:10px;color:#a8a39c;margin-top:1px;">Geopolitical Stress-Tester · Palm Oil Basis</div>
+            </div>
+        </div>
+
+        <div id="help-panel-body">
+
+            <!-- About -->
+            <div class="help-section-title">About</div>
+            <p style="font-size:12px;color:#6b665f;line-height:1.6;">
+                Sentinel-Arb simulates how geopolitical shocks — port blockages, export bans, and weather events — move the <strong style="color:#504c47;">CIF Rotterdam − FOB Malaysia palm oil basis spread</strong> in real time. It's a live trading simulation dashboard powered by a stochastic market engine, live commodity prices, and AI-driven news analysis.
+            </p>
+
+            <!-- What it does -->
+            <div class="help-section-title">What it does</div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#f4f7f4;">📈</div>
+                <span>Runs a mean-reverting price simulation (Ornstein-Uhlenbeck process) anchored to real World Bank commodity prices.</span>
+            </div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#fdf6f3;">⚡</div>
+                <span>Lets you inject pre-built geopolitical shocks — Malacca blockage, Indonesia export ban, EU deforestation rules — and instantly see the spread widen.</span>
+            </div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#f5f0ea;">🤖</div>
+                <span>Uses Claude Haiku to score live palm oil headlines for market impact and auto-injects high-severity events as shocks.</span>
+            </div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#f0efed;">📋</div>
+                <span>Generates an AI Trader's Brief for every active shock — reasoning over compounded freight + spread multipliers.</span>
+            </div>
+
+            <!-- FAQs -->
+            <div class="help-section-title">FAQs</div>
+
+            <div class="help-faq-item">
+                <div class="help-faq-q">What is the "basis spread"?</div>
+                <div class="help-faq-a">It's the price gap between CIF Rotterdam (European landed price) and FOB Malaysia (origin price). It represents the total cost of shipping palm oil from Malaysia to Europe, plus a geopolitical risk premium.</div>
+            </div>
+            <div class="help-faq-item">
+                <div class="help-faq-q">Is this real market data?</div>
+                <div class="help-faq-a">The anchor prices are fetched live from the World Bank Commodity API. The tick-by-tick simulation is stochastic — it models realistic price behaviour but is not a live trading feed.</div>
+            </div>
+            <div class="help-faq-item">
+                <div class="help-faq-q">What happens when I inject a shock?</div>
+                <div class="help-faq-a">The engine multiplies the spread and adds a freight surcharge (e.g. +$35/MT for a Malacca blockage). Multiple shocks stack — freight is summed, multipliers are compounded. Claude then writes a Trader's Brief explaining the risk.</div>
+            </div>
+            <div class="help-faq-item">
+                <div class="help-faq-q">Are my changes visible to other users?</div>
+                <div class="help-faq-a">Yes — this is a shared simulation. Everyone connecting to the same server sees the same market state and any shocks currently active.</div>
+            </div>
+            <div class="help-faq-item">
+                <div class="help-faq-q">Does it need an API key?</div>
+                <div class="help-faq-a">Without one, the dashboard runs fully in simulation mode — all market logic, shocks, and charts work, but AI analysis uses deterministic fallback responses instead of real Claude output.</div>
+            </div>
+
+            <!-- Impact -->
+            <div class="help-section-title">Impact</div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#e6ede6;">🌍</div>
+                <span><strong style="color:#504c47;">Geopolitical literacy</strong> — visualises how a single chokepoint (Malacca, Suez) can cascade into European food costs within hours.</span>
+            </div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#f4f7f4;">🧠</div>
+                <span><strong style="color:#504c47;">AI-augmented trading</strong> — demonstrates how LLMs can score news, quantify market impact, and reason over compound risk in real time.</span>
+            </div>
+            <div class="help-impact-row">
+                <div class="help-impact-icon" style="background:#fdf6f3;">📦</div>
+                <span><strong style="color:#504c47;">Supply chain awareness</strong> — palm oil underpins 50% of packaged goods globally. Basis volatility here ripples into food, cosmetics, and biofuel markets.</span>
+            </div>
+
+            <!-- Footer note -->
+            <div style="font-size:10px;color:#c8c4bf;text-align:center;margin-top:20px;padding-top:12px;border-top:1px solid #f0efed;">
+                Built with Python · Tornado · Claude Haiku
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
