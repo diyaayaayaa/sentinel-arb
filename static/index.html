@@ -87,6 +87,36 @@
         }
         .tip:hover::after { opacity: 1; }
 
+        /* ── Card metric tooltips ─────────────────────────── */
+        .metric-label { position: relative; display: inline-flex; align-items: center; gap: 4px; cursor: default; }
+        .metric-label .metric-tip {
+            visibility: hidden; opacity: 0;
+            position: absolute; top: calc(100% + 8px); left: 0;
+            background: #37342f; color: #f5f0ea;
+            font-size: 11px; line-height: 1.45; font-weight: 400;
+            padding: 7px 11px; border-radius: 9px;
+            white-space: nowrap; z-index: 200;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            pointer-events: none;
+        }
+        .metric-label .metric-tip::before {
+            content: '';
+            position: absolute; bottom: 100%; left: 14px;
+            border: 5px solid transparent;
+            border-bottom-color: #37342f;
+        }
+        .metric-label:hover .metric-tip { visibility: visible; opacity: 1; }
+        .metric-label .info-icon {
+            width: 13px; height: 13px; border-radius: 50%;
+            background: #e0dedb; color: #8a847c;
+            font-size: 9px; font-weight: 700; font-style: normal;
+            display: inline-flex; align-items: center; justify-content: center;
+            line-height: 1; flex-shrink: 0;
+            transition: background 0.2s ease;
+        }
+        .metric-label:hover .info-icon { background: #c8c4bf; color: #504c47; }
+
         /* ── Button style ─────────────────────────────────── */
         .btn {
             border-radius: 10px; font-weight: 500; font-size: 13px;
@@ -154,22 +184,38 @@
         <!-- ── Price Cards Row ──────────────────────────────────────── -->
         <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="card p-5">
-                <div class="text-xs text-stone-400 mb-1">FOB Malaysia</div>
+                <div class="metric-label text-xs text-stone-400 mb-1">
+                    FOB Malaysia
+                    <i class="info-icon">i</i>
+                    <span class="metric-tip">Free On Board Malaysia — the raw CPO price at origin port,<br>before any shipping, insurance or freight charges.</span>
+                </div>
                 <div id="fob-price" class="text-2xl font-semibold text-stone-800 font-mono">—</div>
                 <div class="text-[11px] text-stone-300 mt-1">$/MT CPO</div>
             </div>
             <div class="card p-5">
-                <div class="text-xs text-stone-400 mb-1">CIF Rotterdam</div>
+                <div class="metric-label text-xs text-stone-400 mb-1">
+                    CIF Rotterdam
+                    <i class="info-icon">i</i>
+                    <span class="metric-tip">Cost, Insurance &amp; Freight Rotterdam — the landed price<br>in Europe, including all shipping and insurance costs.</span>
+                </div>
                 <div id="cif-price" class="text-2xl font-semibold text-stone-800 font-mono">—</div>
                 <div class="text-[11px] text-stone-300 mt-1">$/MT Refined</div>
             </div>
             <div class="card p-5" id="spread-card">
-                <div class="text-xs text-stone-400 mb-1">Basis Spread</div>
+                <div class="metric-label text-xs text-stone-400 mb-1">
+                    Basis Spread
+                    <i class="info-icon">i</i>
+                    <span class="metric-tip">CIF Rotterdam minus FOB Malaysia — the premium paid for<br>logistics &amp; risk. Widens under geopolitical stress.</span>
+                </div>
                 <div id="spread-price" class="text-2xl font-semibold text-sage-600 font-mono">—</div>
                 <div id="spread-deviation" class="text-[11px] text-stone-300 mt-1">vs fair value</div>
             </div>
             <div class="card p-5" id="shock-status-card">
-                <div class="text-xs text-stone-400 mb-1">Market Status</div>
+                <div class="metric-label text-xs text-stone-400 mb-1">
+                    Market Status
+                    <i class="info-icon">i</i>
+                    <span class="metric-tip">Real-time signal tracking active shocks — port blockages,<br>export bans or weather events — stressing the spread.</span>
+                </div>
                 <div id="shock-status" class="text-2xl font-semibold text-stone-300">Nominal</div>
                 <div id="shock-count-label" class="text-[11px] text-stone-300 mt-1">No active shocks</div>
             </div>
@@ -337,18 +383,23 @@
                     </div>
                 </div>
 
-                <!-- Trader's Brief -->
-                <div id="traders-brief-panel" class="card p-5 hidden">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-sm font-semibold text-sand-500">Trader's Brief</h2>
-                        <button onclick="closeBrief()" class="text-stone-300 hover:text-stone-500 transition-colors">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div id="brief-content" class="space-y-3 text-sm"></div>
-                </div>
-
             </div>
+        </section>
+
+        <!-- ── Trader's Brief — full-width horizontal ──────────────── -->
+        <section id="traders-brief-panel" class="card p-6 hidden">
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-sm font-semibold text-sand-500">Trader's Brief</h2>
+                    <div id="brief-compound-badge" class="hidden"></div>
+                </div>
+                <button onclick="closeBrief()" class="text-stone-300 hover:text-stone-500 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="brief-compound-banner" class="mb-3"></div>
+            <div id="brief-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-sm"></div>
+            <p id="brief-simulated-note" class="hidden text-[10px] text-stone-300 italic mt-3">Simulated — configure API key for real analysis</p>
         </section>
 
     </main>
@@ -665,36 +716,39 @@
     // TRADER'S BRIEF
     // ═════════════════════════════════════════════════════════════════
     function showTradersBrief(brief, shock, combinedState) {
-        const panel = document.getElementById('traders-brief-panel');
+        const panel   = document.getElementById('traders-brief-panel');
         const content = document.getElementById('brief-content');
+        const banner  = document.getElementById('brief-compound-banner');
+        const simNote = document.getElementById('brief-simulated-note');
+        const badge   = document.getElementById('brief-compound-badge');
+
         const isCompound = brief.compound_mode || (combinedState && combinedState.count > 1);
         const shockCount = brief.active_shock_count || (combinedState && combinedState.count) || 1;
 
-        // Compound shock header banner
-        let compoundBanner = '';
+        // Compound banner (full-width row above the grid)
         if (isCompound && combinedState) {
-            const names = (combinedState.shock_names || []).join(' + ');
+            const names   = (combinedState.shock_names || []).join(' + ');
             const compMult = combinedState.combined_spread_multiplier
-                ? combinedState.combined_spread_multiplier.toFixed(3) + 'x'
-                : '—';
-            compoundBanner = `
-                <div class="bg-clay-50 border border-clay-200 rounded-lg p-3 mb-1" style="background:#fdf6f3;border-color:#f0cfc0;">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-[10px] font-bold text-clay-500" style="color:#c06e4a;">⚡ COMPOUND SHOCK — ${shockCount} ACTIVE</span>
+                ? combinedState.combined_spread_multiplier.toFixed(3) + 'x' : '—';
+            banner.innerHTML = `
+                <div class="rounded-xl p-3" style="background:#fdf6f3;border:1px solid #f0cfc0;">
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span class="text-[10px] font-bold" style="color:#c06e4a;">⚡ COMPOUND SHOCK — ${shockCount} ACTIVE</span>
+                        <span class="text-[11px] text-stone-500">${names}</span>
+                        <span class="text-[11px] font-mono text-stone-600">Compounded: <strong>${compMult}</strong> · Freight: +$${combinedState.combined_freight_impact || 0}/MT</span>
                     </div>
-                    <p class="text-[11px] text-stone-500">${names}</p>
-                    <p class="text-[11px] font-mono text-stone-600 mt-1">Compounded multiplier: <strong>${compMult}</strong> · Freight: +$${combinedState.combined_freight_impact || 0}/MT</p>
-                    <p class="text-[10px] text-stone-400 mt-1">This brief accounts for the combined effect of all active shocks.</p>
                 </div>`;
+            banner.classList.remove('hidden');
+            badge.innerHTML = `<span class="badge" style="background:#fdf6f3;color:#c06e4a;">${shockCount} shocks</span>`;
+            badge.classList.remove('hidden');
+        } else {
+            banner.innerHTML = '';
+            banner.classList.add('hidden');
+            badge.classList.add('hidden');
         }
 
-        const borderColors = {
-            Impact: '#d4a76a',
-            Risk:   '#c06e4a',
-            Insight:'#7da67d',
-            Action: '#5d8a5d',
-        };
-
+        // Section cards — horizontal grid
+        const borderColors = { Impact:'#d4a76a', Risk:'#c06e4a', Insight:'#7da67d', Action:'#5d8a5d' };
         const sections = [
             { label: 'Impact',  text: brief.impact },
             { label: 'Risk',    text: brief.risk },
@@ -702,13 +756,20 @@
         ];
         if (brief.recommendation) sections.push({ label: 'Action', text: brief.recommendation });
 
-        content.innerHTML = compoundBanner + sections.map(s => `
-            <div class="bg-stone-50 rounded-lg p-3" style="border-left: 3px solid ${borderColors[s.label] || '#c8c4bf'};">
-                <div class="text-[10px] font-semibold text-stone-400 mb-1">${s.label.toUpperCase()}</div>
-                <p class="text-xs text-stone-600 leading-relaxed">${s.text}</p>
+        content.innerHTML = sections.map(s => `
+            <div class="bg-stone-50 rounded-xl p-4 flex flex-col" style="border-left: 3px solid ${borderColors[s.label] || '#c8c4bf'};">
+                <div class="text-[10px] font-semibold text-stone-400 mb-2">${s.label.toUpperCase()}</div>
+                <p class="text-xs text-stone-600 leading-relaxed flex-1">${s.text}</p>
             </div>
-        `).join('') + (brief.simulated ? '<p class="text-[10px] text-stone-300 italic mt-1">Simulated — configure API key for real analysis</p>' : '');
+        `).join('');
+
+        // Simulated note
+        if (brief.simulated) { simNote.classList.remove('hidden'); }
+        else { simNote.classList.add('hidden'); }
+
         panel.classList.remove('hidden');
+        // Smooth scroll into view
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     function closeBrief() { document.getElementById('traders-brief-panel').classList.add('hidden'); }
 
