@@ -2,7 +2,7 @@
 
 **Geopolitical Stress-Tester & Palm Oil Basis Monitor**
 
-A real-time trading simulation dashboard that models how geopolitical shocks — port blockages, export bans, weather events — affect the **CIF Rotterdam − FOB Malaysia palm oil basis spread**.
+A real-time trading simulation dashboard that models how geopolitical shocks, port blockages, export bans, weather events, affect the **CIF Rotterdam − FOB Malaysia palm oil basis spread**.
 
 ---
 
