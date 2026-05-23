@@ -472,7 +472,7 @@ def make_app():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", sys.argv[1] if len(sys.argv) > 1 else 8000))
+    port = int(os.environ.get("PORT", 8000))
     app = make_app()
     app.listen(port)
 
